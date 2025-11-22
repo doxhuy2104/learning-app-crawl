@@ -1,6 +1,7 @@
 export class CreateParagraphDto {
     title: string;
     content: string;
-    url?: string;
+    examId: number;
+    titleExamId: string;
 }
 

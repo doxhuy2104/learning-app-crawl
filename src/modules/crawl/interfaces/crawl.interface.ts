@@ -9,6 +9,10 @@ export interface CrawlResult {
         coursesCount?: number;
         lessonsCount?: number;
         examsCount?: number;
+        paragraphsCount?: number;
+        questionsCount?: number;
+        answersCount?: number;
+        subjectCount?: number
     };
 }
 

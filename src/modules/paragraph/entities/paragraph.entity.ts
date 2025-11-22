@@ -9,8 +9,15 @@ export class Paragraph {
     @Column({ type: 'varchar', length: 500 })
     title: string;
 
-    @Column({ type: 'varchar', length: 1000, nullable: true })
-    url: string;
+    @Column({ type: 'text' })
+    content: string;
+
+    @Column({ type: 'int' })
+    examId: number;
+
+    @Column({ type: 'varchar', length: 255 })
+    titleExamId: string;
+
 
     @OneToMany(() => Question, question => question.paragraph)
     questions: Question[];

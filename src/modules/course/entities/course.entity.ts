@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { Lesson } from '../../lesson/entities/lesson.entity';
+import { Subject } from 'src/modules/subject/entities/subject.entity';
 
 @Entity('courses')
 export class Course {
@@ -14,5 +15,11 @@ export class Course {
 
     @OneToMany(() => Lesson, lesson => lesson.course)
     lessons: Lesson[];
+
+    @Column({ type: 'int', nullable: true })
+    subjectId: number;
+
+    @Column({ type: 'boolean', default: false })
+    isExam: boolean;
 }
 

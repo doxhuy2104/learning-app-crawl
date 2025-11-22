@@ -29,9 +29,9 @@ export class ParagraphService {
         });
     }
 
-    async findByurl(url: string): Promise<Paragraph | null> {
+    async findByTitleExamId(titleExamId: string): Promise<Paragraph | null> {
         return await this.paragraphRepository.findOne({
-            where: { url },
+            where: { titleExamId },
         });
     }
 

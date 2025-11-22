@@ -25,6 +25,9 @@ export class Exam {
     @Column({ type: 'int', nullable: true })
     lessonId: number;
 
+    @Column({ type: 'int', nullable: true })
+    courseId: number;
+
     @ManyToOne(() => Lesson, lesson => lesson.exams, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'lessonId' })
     lesson: Lesson;

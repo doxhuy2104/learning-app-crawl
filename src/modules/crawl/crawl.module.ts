@@ -7,6 +7,7 @@ import { ExamModule } from '../exam/exam.module';
 import { QuestionModule } from '../question/question.module';
 import { AnswerModule } from '../answer/answer.module';
 import { ParagraphModule } from '../paragraph/paragraph.module';
+import { SubjectModule } from '../subject/subject.module';
 
 @Module({
     imports: [
@@ -15,7 +16,8 @@ import { ParagraphModule } from '../paragraph/paragraph.module';
         ExamModule,
         QuestionModule,
         AnswerModule,
-        ParagraphModule
+        ParagraphModule,
+        SubjectModule
     ],
     controllers: [CrawlController],
     providers: [CrawlService],

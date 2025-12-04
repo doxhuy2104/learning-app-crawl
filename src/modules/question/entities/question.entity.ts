@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Exam } from '../../exam/entities/exam.entity';
 import { Answer } from '../../answer/entities/answer.entity';
 import { Paragraph } from 'src/modules/paragraph/entities/paragraph.entity';
+import { SubExam } from '../../sub-exam/entities/sub-exam.entity';
 
 @Entity('questions')
 export class Question {
@@ -12,7 +13,7 @@ export class Question {
     content: string;
 
     @Column({ type: 'varchar', length: 100, default: 'choice' })
-    type: string; // 'choice', 'drag_drop', 'fill_blank', 'true_false'
+    type: string; // 'choice', 'true_false', 'short_answer'
 
     @Column({ type: 'varchar', length: 100, default: 'html' })
     dataType: string;
@@ -26,18 +27,31 @@ export class Question {
     @Column({ type: 'int' })
     examId: number;
 
-    @Column({ type: 'int', nullable: true })
-    paragraphId: number;
+    // @Column({ type: 'int', nullable: true })
+    // paragraphId: number;
 
-    @ManyToOne(() => Paragraph, paragraph => paragraph.questions, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'paragraphId' })
-    paragraph: Paragraph;
+    // @ManyToOne(() => Paragraph, paragraph => paragraph.questions, { onDelete: 'CASCADE' })
+    // @JoinColumn({ name: 'paragraphId' })
+    // paragraph: Paragraph;
 
     @ManyToOne(() => Exam, exam => exam.questions, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'examId' })
     exam: Exam;
 
+    @Column({ type: 'int', nullable: true })
+    subExamId: number;
+
+    @ManyToOne(() => SubExam, subExam => subExam.questions, { onDelete: 'CASCADE', nullable: true })
+    @JoinColumn({ name: 'subExamId' })
+    subExam: SubExam;
+
     @OneToMany(() => Answer, answer => answer.question)
     answers: Answer[];
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    shortAnswer: string;
+
+    @Column({ type: 'boolean', nullable: true })
+    trueFalse: boolean;
 }
 

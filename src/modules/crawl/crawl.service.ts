@@ -281,7 +281,12 @@ export class CrawlService {
 
             const chapterItems = $('.chapter-item');
 
-            for (let i = 0; i < chapterItems.length; i++) {
+            let len = chapterItems.length;
+            if (subjectId == 1 || subjectId == 3 || subjectId == 4 || subjectId == 5 || subjectId == 10) {
+                len = len - 1;
+            }
+
+            for (let i = 0; i < len; i++) {
                 const chapterElement = chapterItems.eq(i);
 
                 const courseTitle = chapterElement.find('.chapter-head a span').text().trim();
@@ -292,7 +297,7 @@ export class CrawlService {
                 const courseData = {
                     title: courseTitle,
                     url: courseUrl,
-                    subjectId: subjectId
+                    subjectId: subjectId,
                 };
 
                 const existingCourse = await this.courseService.findByurl(courseUrl);
@@ -309,6 +314,7 @@ export class CrawlService {
                 const lessonItems = chapterElement.find('ul.lesson-wrapper > li.exam-item');
 
                 for (let j = 0; j < lessonItems.length; j++) {
+
                     const lessonElement = lessonItems.eq(j);
 
                     const lessonLink = lessonElement.find('.exam-body > p.exam-test.mb-0 > a');
@@ -316,7 +322,9 @@ export class CrawlService {
 
                     const lessonTitle = lessonLink.text().trim();
                     const collapseId = lessonLink.attr('href') || '';
-
+                    if (j == 0 && (lessonTitle.includes("Đề thi") || lessonTitle.includes("đề thi") || lessonTitle.includes("Đề ôn") || lessonTitle.includes("đề ôn"))) {
+                        this.courseService.update(course.id, { isExam: true });
+                    }
                     if (!lessonTitle) continue;
 
                     const lessonData = {
@@ -344,7 +352,10 @@ export class CrawlService {
 
                         const examTitleFull = examElement.find('.exam-body p.exam-test a.url-main').text().trim();
                         const examUrl = examElement.find('.exam-body p.exam-test a.url-main').attr('href') || '';
-
+                        const examQuantity = parseInt(examElement.find('.exam-body div .exam-action a').attr('data-number') || '');
+                        if (Number.isNaN(examQuantity)) {
+                            continue;
+                        }
                         if (!examTitleFull || !examUrl) continue;
 
                         const examData = {
@@ -352,7 +363,8 @@ export class CrawlService {
                             url: examUrl,
                             orderIndex: k + 1,
                             lessonId: lesson.id,
-                            courseId: course.id
+                            courseId: course.id,
+                            quantity: examQuantity
                         };
 
                         const existingExam = await this.examService.findByurl(examUrl);
@@ -455,17 +467,17 @@ export class CrawlService {
         }
     }
 
-    async crawlQuestionsTest(examUrl: string, cookie?: string): Promise<CrawlResult> {
+    async crawlQuestions(examId: number, examUrl: string, cookie?: string, courseId?: number, subExamId?: number): Promise<CrawlResult> {
         try {
             const html = await this.crawlUrl(examUrl, cookie);
             const $ = cheerio.load(html);
 
             const results: {
-                paragraphs: any[];
+                // paragraphs: any[];
                 questions: any[];
                 answers: any[];
             } = {
-                paragraphs: [],
+                // paragraphs: [],
                 questions: [],
                 answers: [],
             };
@@ -476,129 +488,135 @@ export class CrawlService {
             console.log(qasChildren.length);
             // const questionItems = $('.quiz-answer-item');
 
-            let paragraphId: number | undefined;
-            let paragraphTitle: string = '';
-            let titleExamId: string = '';
+            let trueFalseQuestionId: number | undefined;
+            let trueFalseAnswerCount: number = 0;
             for (let i = 0; i < qasChildren.length; i++) {
                 const questionElement = qasChildren.eq(i);
                 const classes = questionElement.attr('class');
-                if (classes?.includes('text-center')) {
-                    paragraphTitle = questionElement.text().trim();
-                    titleExamId = `${paragraphTitle}-${1}`;
-                } else if (classes?.includes('is-paragraph')) {
-                    const paragraphContentRaw = questionElement.html() || '';
-                    const paragraphContent = this.removeClassFromParagraphs(paragraphContentRaw);
-                    const paragraphData = {
-                        content: paragraphContent,
-                        title: paragraphTitle,
-                        examId: 1,
-                        titleExamId: titleExamId
+
+                if (classes?.includes('is-paragraph')) {
+                    const questionTitleRaw = questionElement.html() || '';
+                    const questionTitle = this.removeClassFromParagraphs(questionTitleRaw);
+                    const questionData: any = {
+                        content: questionTitle,
+                        type: 'true_false',
+                        orderIndex: i + 1,
+                        examId: examId,
                     };
 
+                    const question = await this.questionService.create(questionData);
+                    results.questions.push(question);
 
-                    results.paragraphs.push(paragraphData);
+                    trueFalseQuestionId = question.id;
+                    trueFalseAnswerCount = 0;
+                    // results.paragraphs.push(paragraph);
                 } else {
+                    if (trueFalseQuestionId != undefined) {
+                        trueFalseAnswerCount++;
+                        if (trueFalseAnswerCount > 4) {
+                            trueFalseAnswerCount = 0;
+                            trueFalseQuestionId = undefined;
+                        }
+                        else {
+                            const answerContentRaw = questionElement.find('.quiz-answer-left .question .title-question').html() || '';
 
-                    // const numberQuestion = questionElement.find('.quiz-answer-left .number-question').text().trim();
-                    const questionTitleRaw = questionElement.find('.quiz-answer-left .question .title-question').html() || '';
+                            if (!answerContentRaw) continue;
 
-                    if (!questionTitleRaw) continue;
+                            const answerContent = this.removeClassFromParagraphs(answerContentRaw);
 
-                    const questionTitle = this.removeClassFromParagraphs(questionTitleRaw);
 
-                    const hasTable = questionElement.find('table').length > 0;
-                    const hasBlank = questionTitle.includes("_____");
+                            const explanationRaw = questionElement.find('.quiz-answer-right .result.box-hint').html();
+                            if (!explanationRaw) continue;
+                            const explanation = this.removeClassFromParagraphs(explanationRaw);
 
-                    function detectDragDrop(html: string): boolean {
-                        const $ = cheerio.load(html);
+                            const isCorrect = explanationRaw.includes("Đúng");
 
-                        const paragraphs = $('p');
+                            const answerData = {
+                                content: answerContent,
+                                isCorrect: isCorrect,
+                                orderIndex: trueFalseAnswerCount,
+                                questionId: trueFalseQuestionId,
+                            };
 
-                        for (let i = 0; i < paragraphs.length; i++) {
-                            const $p = $(paragraphs[i]);
+                            const answer = await this.answerService.create(answerData);
+                            results.answers.push(answer);
+                        }
+                    } else {
+                        // const numberQuestion = questionElement.find('.quiz-answer-left .number-question').text().trim();
+                        const questionTitleRaw = questionElement.find('.quiz-answer-left .question .title-question').html() || '';
 
-                            const children = $p.contents();
+                        if (!questionTitleRaw) continue;
 
-                            let consecutiveImgSpans = 0;
-                            let maxConsecutive = 0;
+                        const questionTitle = this.removeClassFromParagraphs(questionTitleRaw);
 
-                            children.each((j, node) => {
-                                if (node.type === 'tag' && node.name === 'span') {
-                                    const $span = $(node);
-                                    const hasImg = $span.find('img').length > 0;
+                        // Check answer elements to determine question type
+                        const answerContainer = questionElement.find('.answer-check.radio');
+                        const optionNoneElements = answerContainer.find('.option-choices.option-none');
+                        // const trueFalseOption = answerContainer.find('.true_false-option');
+                        const choiceOptions = answerContainer.find('.option-choices.js-answer[data-answer]');
 
-                                    if (hasImg) {
-                                        consecutiveImgSpans++;
-                                        maxConsecutive = Math.max(maxConsecutive, consecutiveImgSpans);
-                                    } else {
-                                        consecutiveImgSpans = 0;
-                                    }
-                                } else if (node.type === 'text') {
-                                    const text = $(node).text().trim();
-                                    if (text.length > 0) {
-                                        consecutiveImgSpans = 0;
-                                    }
-                                } else {
-                                    consecutiveImgSpans = 0;
-                                }
-                            });
+                        let type: string;
+                        let answerElements;
+                        let shortAnswer: string | null = null;
+                        let trueFalse: boolean | null = null;
 
-                            if (maxConsecutive >= 2) {
-                                return true;
-                            }
+                        if (optionNoneElements.length > 0) {
+                            type = "short_answer";
+                        }
+                        else {
+                            type = "choice";
+                            answerElements = choiceOptions;
                         }
 
-                        return false;
-                    }
-
-                    const hasDragDropImages = detectDragDrop(questionTitle) || questionTitle.includes("éo thả");
-                    let type: string;
-                    if (hasTable) {
-                        type = "true_false";
-                    } else if (hasDragDropImages) {
-                        type = "drag_drop";
-                    } else if (hasBlank) {
-                        type = "fill_blank";
-                    } else {
-                        type = 'choice';
-                    }
-
-                    const answerElements = questionElement.find('.answer-check.radio .option-choices.js-answer');
-
-
-                    const questionData = {
-                        content: questionTitle,
-                        type: type,
-                        orderIndex: i + 1,
-                        examId: 1,
-                        paragraphId: paragraphId
-                    };
-
-                    results.questions.push(questionData);
-
-
-                    for (let j = 0; j < answerElements.length; j++) {
-                        const answerElement = answerElements.eq(j);
-
-                        const isCorrect = answerElement.attr('data-answer') === 'Y';
-                        const answerContentRaw = answerElement.find('.option-content').html() || '';
-
-                        if (!answerContentRaw) continue;
-
-                        const answerContent = this.removeClassFromParagraphs(answerContentRaw);
-
-                        const answerData = {
-                            content: answerContent,
-                            isCorrect: isCorrect,
-                            orderIndex: j + 1,
-                            questionId: 1,
+                        const questionData: any = {
+                            content: questionTitle,
+                            type: type,
+                            orderIndex: i + 1,
+                            examId: examId,
                         };
 
-                        results.answers.push(answerData);
+                        // Add shortAnswer or trueFalse based on type
+                        if (type === "short_answer") {
+                            questionData.shortAnswer = null; // Will be set from explanation or answer
+                        } else if (type === "true_false") {
+                            questionData.trueFalse = null; // Will be set from answer
+                        }
+
+                        const question = await this.questionService.create(questionData);
+                        results.questions.push(question);
+
+
+
+                        if (answerElements != undefined)
+                            for (let j = 0; j < answerElements.length; j++) {
+                                const answerElement = answerElements.eq(j);
+
+                                const isCorrect = answerElement.attr('data-answer') === 'Y';
+                                const answerContentRaw = answerElement.find('.option-content').html() || '';
+
+                                if (!answerContentRaw) continue;
+
+                                const answerContent = this.removeClassFromParagraphs(answerContentRaw);
+
+                                const answerData = {
+                                    content: answerContent,
+                                    isCorrect: isCorrect,
+                                    orderIndex: j + 1,
+                                    questionId: question.id,
+                                };
+
+                                const answer = await this.answerService.create(answerData);
+                                results.answers.push(answer);
+                            }
+
+                        const explanationRaw = questionElement.find('.quiz-answer-right .result.box-hint').html();
+                        if (explanationRaw) {
+                            const explanation = this.removeClassFromParagraphs(explanationRaw);
+                            await this.questionService.update(question.id, {
+                                explanation: explanation,
+                            } as any);
+                        }
                     }
-
-
-
                 }
             }
 
@@ -625,7 +643,7 @@ export class CrawlService {
         }
     }
 
-    async crawlQuestions(examId: number, examUrl: string, cookie?: string, courseId?: number,): Promise<CrawlResult> {
+    async crawlQuestionsTSA(examId: number, examUrl: string, cookie?: string, courseId?: number, subExamId?: number): Promise<CrawlResult> {
         try {
             const html = await this.crawlUrl(examUrl, cookie);
             const $ = cheerio.load(html);
@@ -810,193 +828,6 @@ export class CrawlService {
             };
         }
     }
-
-    async crawlQuestions2025(examId: number, examUrl: string, cookie?: string, courseId?: number,): Promise<CrawlResult> {
-        try {
-            const html = await this.crawlUrl(examUrl, cookie);
-            const $ = cheerio.load(html);
-
-            const results: {
-                paragraphs: any[];
-                questions: any[];
-                answers: any[];
-            } = {
-                paragraphs: [],
-                questions: [],
-                answers: [],
-            };
-
-            const qasElement = $('.qas').first();
-
-            const qasChildren = qasElement.children();
-            console.log(qasChildren.length);
-            // const questionItems = $('.quiz-answer-item');
-
-            let paragraphId: number | undefined;
-            let paragraphTitle: string = '';
-            let titleExamId: string = '';
-            for (let i = 0; i < qasChildren.length; i++) {
-                const questionElement = qasChildren.eq(i);
-                const classes = questionElement.attr('class');
-                if (classes?.includes('text-center')) {
-                    paragraphTitle = questionElement.text().trim();
-                    titleExamId = `${paragraphTitle}-${examId}`;
-                } else if (classes?.includes('is-paragraph')) {
-                    const paragraphContentRaw = questionElement.html() || '';
-                    const paragraphContent = this.removeClassFromParagraphs(paragraphContentRaw);
-                    const paragraphData = {
-                        content: paragraphContent,
-                        title: paragraphTitle,
-                        examId: examId,
-                        titleExamId: titleExamId
-                    };
-
-                    const existingParagraph = await this.paragraphService.findByTitleExamId(titleExamId);
-                    let paragraph;
-
-                    if (existingParagraph) {
-                        paragraph = await this.paragraphService.update(existingParagraph.id, paragraphData);
-                    } else {
-                        paragraph = await this.paragraphService.create(paragraphData);
-                    }
-                    paragraphId = paragraph.id;
-                    results.paragraphs.push(paragraph);
-                } else {
-
-                    // const numberQuestion = questionElement.find('.quiz-answer-left .number-question').text().trim();
-                    const questionTitleRaw = questionElement.find('.quiz-answer-left .question .title-question').html() || '';
-
-                    if (!questionTitleRaw) continue;
-
-                    const questionTitle = this.removeClassFromParagraphs(questionTitleRaw);
-
-                    const hasTable = questionElement.find('table').length > 0;
-                    const hasBlank = questionTitle.includes("_____");
-
-                    function detectDragDrop(html: string): boolean {
-                        const $ = cheerio.load(html);
-
-                        const paragraphs = $('p');
-
-                        for (let i = 0; i < paragraphs.length; i++) {
-                            const $p = $(paragraphs[i]);
-
-                            const children = $p.contents();
-
-                            let consecutiveImgSpans = 0;
-                            let maxConsecutive = 0;
-
-                            children.each((j, node) => {
-                                if (node.type === 'tag' && node.name === 'span') {
-                                    const $span = $(node);
-                                    const hasImg = $span.find('img').length > 0;
-
-                                    if (hasImg) {
-                                        consecutiveImgSpans++;
-                                        maxConsecutive = Math.max(maxConsecutive, consecutiveImgSpans);
-                                    } else {
-                                        consecutiveImgSpans = 0;
-                                    }
-                                } else if (node.type === 'text') {
-                                    const text = $(node).text().trim();
-                                    if (text.length > 0) {
-                                        consecutiveImgSpans = 0;
-                                    }
-                                } else {
-                                    consecutiveImgSpans = 0;
-                                }
-                            });
-
-                            if (maxConsecutive >= 2) {
-                                return true;
-                            }
-                        }
-
-                        return false;
-                    }
-
-                    const hasDragDropImages = detectDragDrop(questionTitle) || questionTitle.includes("éo thả");
-                    let type: string;
-                    if (hasTable) {
-                        type = "true_false";
-                    } else if (hasDragDropImages) {
-                        type = "drag_drop";
-                    } else if (hasBlank) {
-                        type = "fill_blank";
-                    } else {
-                        type = 'choice';
-                    }
-
-                    const answerElements = questionElement.find('.answer-check.radio .option-choices.js-answer');
-
-
-                    const questionData = {
-                        content: questionTitle,
-                        type: type,
-                        orderIndex: i + 1,
-                        examId: examId,
-                        paragraphId: paragraphId
-                    };
-
-                    const question = await this.questionService.create(questionData);
-                    results.questions.push(question);
-
-
-                    for (let j = 0; j < answerElements.length; j++) {
-                        const answerElement = answerElements.eq(j);
-
-                        const isCorrect = answerElement.attr('data-answer') === 'Y';
-                        const answerContentRaw = answerElement.find('.option-content').html() || '';
-
-                        if (!answerContentRaw) continue;
-
-                        const answerContent = this.removeClassFromParagraphs(answerContentRaw);
-
-                        const answerData = {
-                            content: answerContent,
-                            isCorrect: isCorrect,
-                            orderIndex: j + 1,
-                            questionId: question.id,
-                        };
-
-                        const answer = await this.answerService.create(answerData);
-                        results.answers.push(answer);
-                    }
-
-                    const explanationRaw = questionElement.find('.quiz-answer-right .result.box-hint').html();
-                    if (explanationRaw) {
-                        const explanation = this.removeClassFromParagraphs(explanationRaw);
-                        await this.questionService.update(question.id, {
-                            explanation: explanation,
-                        } as any);
-                    }
-
-                }
-            }
-
-
-            return {
-                success: true,
-                data: results,
-                metadata: {
-                    timestamp: new Date(),
-                    url: examUrl,
-                    itemsCount: results.questions.length,
-                },
-            };
-        } catch (error) {
-            this.logger.error('Error crawling VietJack exam questions:', error.message);
-            return {
-                success: false,
-                error: error.message,
-                metadata: {
-                    timestamp: new Date(),
-                    url: examUrl,
-                },
-            };
-        }
-    }
-
 
     async crawlCourses(cookie?: string): Promise<CrawlResult> {
         try {
@@ -1138,14 +969,14 @@ export class CrawlService {
                 allExams.push(...exams);
 
                 // for (const exam of exams) {
-                    // const questionsResult = await this.crawlQuestions(exam.id, exam.url, cookie, exam.courseId);
+                // const questionsResult = await this.crawlQuestions(exam.id, exam.url, cookie, exam.courseId);
 
-                    // if (questionsResult.success && questionsResult.data) {
-                    //     totalQuestions += questionsResult.data.questions.length;
-                    //     totalAnswers += questionsResult.data.answers.length;
-                    // }
+                // if (questionsResult.success && questionsResult.data) {
+                //     totalQuestions += questionsResult.data.questions.length;
+                //     totalAnswers += questionsResult.data.answers.length;
+                // }
 
-                    // await new Promise(resolve => setTimeout(resolve, 500));
+                // await new Promise(resolve => setTimeout(resolve, 500));
                 // }
             }
 

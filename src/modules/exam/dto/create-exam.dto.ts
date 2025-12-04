@@ -5,5 +5,6 @@ export class CreateExamDto {
     orderIndex?: number;
     lessonId?: number;
     courseId?: number;
+    quantity?:number
 }
 

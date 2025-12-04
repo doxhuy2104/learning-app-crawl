@@ -21,10 +21,10 @@ export class CrawlController {
         return await this.crawlService.crawlQuestions(dto.examId, dto.url, dto.cookie);
     }
 
-    @Post('questions/test')
-    async crawlQuestionsTest(@Body() dto: CrawlRequestDto) {
-        return await this.crawlService.crawlQuestionsTest(dto.url, dto.cookie);
-    }
+    // @Post('questions/thpt')
+    // async crawlQuestionsTHPT(@Body() dto: CrawlRequestDto) {
+    //     return await this.crawlService.crawlQuestions(0,dto.url, dto.cookie);
+    // }
 
     @Post('paragraphs')
     async crawlParagraphs(@Body() dto: CrawlRequestDto) {
@@ -36,9 +36,9 @@ export class CrawlController {
         return await this.crawlService.crawlTSA(isExam);
     }
 
-    @Get('thpt')
-    async crawlTHPT() {
-        return await this.crawlService.crawlTHPT();
+    @Post('thpt')
+    async crawlTHPT(@Body() dto: CrawlRequestDto) {
+        return await this.crawlService.crawlTHPT(dto.cookie);
     }
 
     @Post('url')

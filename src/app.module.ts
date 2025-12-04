@@ -8,6 +8,7 @@ import { ExamModule } from './modules/exam/exam.module';
 import { QuestionModule } from './modules/question/question.module';
 import { AnswerModule } from './modules/answer/answer.module';
 import { CrawlModule } from './modules/crawl/crawl.module';
+import { SubExamModule } from './modules/sub-exam/sub-exam.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CrawlModule } from './modules/crawl/crawl.module';
     QuestionModule,
     AnswerModule,
     CrawlModule,
+    SubExamModule
   ],
   controllers: [AppController],
   providers: [AppService],

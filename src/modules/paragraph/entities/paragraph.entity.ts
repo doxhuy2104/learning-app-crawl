@@ -19,7 +19,7 @@ export class Paragraph {
     titleExamId: string;
 
 
-    @OneToMany(() => Question, question => question.paragraph)
-    questions: Question[];
+    // @OneToMany(() => Question, question => question.paragraph)
+    // questions: Question[];
 }
 

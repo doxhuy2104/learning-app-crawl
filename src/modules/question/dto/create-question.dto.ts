@@ -5,6 +5,7 @@ export class CreateQuestionDto {
     orderIndex?: number;
     explanation?: string;
     examId: number;
+    subExamId?: number;
     paragraphId?: number;
 }
 

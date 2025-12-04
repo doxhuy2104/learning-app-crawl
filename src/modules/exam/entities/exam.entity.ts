@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { Question } from '../../question/entities/question.entity';
 import { Lesson } from 'src/modules/lesson/entities/lesson.entity';
+import { SubExam } from '../../sub-exam/entities/sub-exam.entity';
 
 @Entity('exams')
 export class Exam {
@@ -9,9 +10,6 @@ export class Exam {
 
     @Column({ type: 'varchar', length: 500 })
     title: string;
-
-    @Column({ type: 'text', nullable: true })
-    description: string;
 
     @Column({ type: 'varchar', length: 1000, nullable: true })
     url: string;
@@ -34,5 +32,11 @@ export class Exam {
 
     @OneToMany(() => Question, question => question.exam)
     questions: Question[];
+
+    @OneToMany(() => SubExam, subExam => subExam.exam)
+    subExams: SubExam[];
+
+    @Column({ type: 'int', default: 1 })
+    quantity: number;
 }
 
